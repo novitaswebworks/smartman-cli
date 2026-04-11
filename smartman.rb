@@ -3,8 +3,8 @@ class Smartman < Formula
 
   desc "Modern Linux man page enhancer with AI explanations and TUI"
   homepage "https://github.com/ambaskaryash/smartman-cli"
-  url "https://github.com/ambaskaryash/smartman-cli/archive/refs/tags/v0.1.0.tar.gz"
-  sha256 "b4c8bfa48f8a8c311b39ae1cbfb90c49cc3856a12d42bfb185e0675e0bfa0bc8"
+  url "https://github.com/ambaskaryash/smartman-cli/archive/refs/tags/v0.1.1.tar.gz"
+  sha256 "dd0444dca6e82aba737540cea3d46c4ff678839163e2feea684cae2f389980e7"
   license "MIT"
 
   depends_on "python@3.12"
