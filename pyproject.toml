@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "smartman"
-version = "0.1.0"
+version = "0.1.1"
 description = "A modern, interactive TUI for Linux man pages with AI explanations and syntax highlighting."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -28,9 +28,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "typer[all]",
+    "typer",
     "rich",
-    "textual[dev]",
+    "textual",
     "pyyaml",
     "requests",
 ]
