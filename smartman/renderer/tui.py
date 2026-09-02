@@ -5,6 +5,7 @@ from rich.console import Group
 from rich.rule import Rule
 from rich.text import Text
 from rich.panel import Panel
+from rich.markup import escape
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -13,8 +14,35 @@ from textual.css.query import NoMatches
 from textual.widgets import Footer, Header, Label, ListItem, ListView, Static, Input
 from textual.reactive import reactive
 
+from typing import AsyncIterator
 from smartman.parser.man_parser import ManPage
 from smartman.renderer.formatter import Formatter
+from textual.command import Provider, Hit
+
+class SmartManCommandProvider(Provider):
+    """Adds custom commands to the Ctrl+P Command Palette."""
+    async def search(self, query: str) -> AsyncIterator[Hit]:
+        matcher = self.matcher(query)
+        app = self.app
+        
+        # AI Command
+        score = matcher.match("Toggle AI Tutor")
+        if score > 0:
+            yield Hit(score, matcher.highlight("Toggle AI Tutor"), app.action_toggle_ai, help="Open or close the AI Explanation sidebar")
+            
+        # Search Command
+        score = matcher.match("Search Document")
+        if score > 0:
+            yield Hit(score, matcher.highlight("Search Document"), app.action_toggle_search, help="Open the search bar")
+            
+        # Section Jumps
+        if hasattr(app, "page") and app.page and isinstance(getattr(app.page, "sections", None), dict):
+            for section in app.page.sections.keys():
+                cmd_name = f"Jump to {section}"
+                score = matcher.match(cmd_name)
+                if score > 0:
+                    yield Hit(score, matcher.highlight(cmd_name), lambda s=section: app.action_jump_section(s), help=f"Scroll directly to {section}")
+
 
 
 class QuickExampleCard(Static):
@@ -54,6 +82,7 @@ class SmartManApp(App):
     """Textual TUI application for SmartMan."""
 
     TITLE = "SmartMan"
+    COMMANDS = App.COMMANDS | {SmartManCommandProvider}
     BINDINGS = [
         Binding("q", "quit", "Quit", show=True),
         Binding("j", "scroll_down", "Scroll Down", show=False),
@@ -66,6 +95,7 @@ class SmartManApp(App):
         Binding("o", "jump_section('OPTIONS')", "OPTIONS", show=True),
         Binding("e", "jump_section('EXAMPLES')", "EXAMPLES", show=True),
         Binding("/", "toggle_search", "Search", show=True),
+        Binding("a", "toggle_ai", "AI Tutor", show=True),
         Binding("escape", "hide_search", "Close Search", show=False),
         Binding("?", "toggle_help", "Help", show=False),
     ]
@@ -104,6 +134,26 @@ class SmartManApp(App):
         color: $accent;
         text-style: bold;
         padding: 1 1;
+        border-bottom: solid $accent;
+    }
+
+    #ai-sidebar {
+        width: 45;
+        dock: right;
+        background: $surface;
+        border-left: tall $accent;
+        padding: 1 2;
+        display: none;
+    }
+
+    #ai-sidebar.visible {
+        display: block;
+    }
+
+    #ai-title {
+        color: $accent;
+        text-style: bold;
+        margin-bottom: 1;
         border-bottom: solid $accent;
     }
 
@@ -195,6 +245,9 @@ class SmartManApp(App):
         self.formatter = Formatter(theme)
         self._section_widgets: dict[str, Static] = {}
         self._last_search = ""
+        self._ai_loading = False
+        self._ai_loaded = False
+        self._ai_worker = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -217,6 +270,10 @@ class SmartManApp(App):
                 with Horizontal(id="search-bar"):
                     yield Label("🔍 ", id="search-icon")
                     yield Input(placeholder="Search keywords...", id="search-input")
+
+            with VerticalScroll(id="ai-sidebar"):
+                yield Label("🤖 AI Tutor", id="ai-title")
+                yield Static("Press 'a' again to generate an AI explanation for this command...", id="ai-content")
 
         yield Footer()
 
@@ -313,6 +370,55 @@ class SmartManApp(App):
 
     def action_hide_search(self) -> None:
         self.show_search = False
+
+    def action_toggle_ai(self) -> None:
+        sidebar = self.query_one("#ai-sidebar")
+        if sidebar.has_class("visible"):
+            sidebar.remove_class("visible")
+            self._ai_loaded = False
+            self._ai_loading = False
+            if self._ai_worker:
+                self._ai_worker.cancel()
+                self._ai_worker = None
+        else:
+            sidebar.add_class("visible")
+            
+            if self._ai_loading or self._ai_loaded:
+                return
+                
+            self._ai_loading = True
+            content = self.query_one("#ai-content", Static)
+            content.update("[bold blue]Fetching AI explanation...[/bold blue]\n\n(This might take a second)")
+            
+            cmd_name = self.page.command
+            raw = self.page.raw_text
+            
+            def worker():
+                from smartman.utils.ai import explain_command
+                try:
+                    explanation = explain_command(cmd_name, raw)
+                    try:
+                        self.call_from_thread(self._handle_ai_response, explanation)
+                    except Exception:
+                        pass
+                except Exception as e:
+                    try:
+                        self.call_from_thread(self._handle_ai_response, f"[bold red]Error:[/bold red] {escape(str(e))}")
+                    except Exception:
+                        pass
+            
+            self._ai_worker = self.run_worker(worker, thread=True)
+
+    def _handle_ai_response(self, text: str) -> None:
+        sidebar = self.query_one("#ai-sidebar")
+        if sidebar.has_class("visible"):
+            self._ai_loading = False
+            self._ai_loaded = True
+            self._ai_worker = None
+            self.query_one("#ai-content", Static).update(text)
+        else:
+            # The sidebar was closed while the request was in the queue
+            self._ai_worker = None
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         """Perform search when user presses Enter."""

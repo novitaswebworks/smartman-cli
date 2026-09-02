@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "smartman"
-version = "0.1.1"
+version = "0.2.0"
 description = "A modern, interactive TUI for Linux man pages with AI explanations and syntax highlighting."
 readme = "README.md"
 requires-python = ">=3.11"
