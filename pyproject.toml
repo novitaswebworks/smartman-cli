@@ -36,10 +36,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/ambaskaryash/smartman-cli"
-Documentation = "https://github.com/ambaskaryash/smartman-cli#readme"
-Repository = "https://github.com/ambaskaryash/smartman-cli.git"
-Issues = "https://github.com/ambaskaryash/smartman-cli/issues"
+Homepage = "https://github.com/novitaswebworks/smartman-cli"
+Documentation = "https://github.com/novitaswebworks/smartman-cli#readme"
+Repository = "https://github.com/novitaswebworks/smartman-cli.git"
+Issues = "https://github.com/novitaswebworks/smartman-cli/issues"
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio", "textual-dev"]
